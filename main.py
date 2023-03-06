@@ -41,18 +41,28 @@ def main(args):
 
     pattern = b'CpuSetup\0'
     offsets = [m.start() + len(pattern) for m in re.finditer(pattern, data)]
+    msg = 'enabled' if args.enable_disable else 'disabled'
+    modified = False
 
     for offset in offsets:
         vals = struct.unpack_from(cpu_setup_format, data, offset)
         cpu_setup = CpuSetup(*vals)
-        cpu_setup.enable_hwp = args.enable_disable
-        new_vals = [getattr(cpu_setup, field.name) for field in fields(cpu_setup)]
-        struct.pack_into(cpu_setup_format, data, offset, *new_vals)
+        if cpu_setup.enable_hwp != args.enable_disable:
+            cpu_setup.enable_hwp = args.enable_disable
+            new_vals = [getattr(cpu_setup, field.name) for field in fields(cpu_setup)]
+            struct.pack_into(cpu_setup_format, data, offset, *new_vals)
+            modified = True
+            print(f'0x{offset:X}: {msg}')
+        else:
+            print(f'0x{offset:X}: already {msg}')
 
-    with open(out_path, 'wb') as out_file:
-        out_file.write(data)
+    if modified:
+        with open(out_path, 'wb') as out_file:
+            out_file.write(data)
+        print(f'Wrote "{out_path}"')
+    else:
+        print('No changes needed')
 
-    print(f'Wrote "{out_path}"')
     return 0
 
 
